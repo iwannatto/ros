@@ -3,27 +3,23 @@
 #![feature(custom_test_frameworks)]
 #![test_runner(crate::test_runner)]
 #![reexport_test_harness_main = "test_main"]
-
-pub mod serial;
-pub mod vga_buffer;
+#![feature(abi_x86_interrupt)]
 
 use core::panic::PanicInfo;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u32)]
-pub enum QemuExitCode {
-    Success = 0x10,
-    Failed = 0x11,
+pub mod gdt;
+pub mod interrupts;
+pub mod serial;
+pub mod vga_buffer;
+
+// Initialize
+
+pub fn init() {
+    gdt::init();
+    interrupts::init_idt();
 }
 
-pub fn exit_qemu(exit_code: QemuExitCode) {
-    use x86_64::instructions::port::Port;
-
-    unsafe {
-        let mut port = Port::new(0xf4);
-        port.write(exit_code as u32);
-    }
-}
+// Test Helper
 
 pub fn test_runner(tests: &[&dyn Fn()]) {
     serial_println!("Running {} tests", tests.len());
@@ -40,9 +36,30 @@ pub fn test_panic_handler(info: &PanicInfo) -> ! {
     loop {}
 }
 
+// Call QEMU's ISA debug exit (see Cargo.toml/package.metadata.bootimage)
+pub fn exit_qemu(exit_code: QemuExitCode) {
+    use x86_64::instructions::port::Port;
+
+    unsafe {
+        let mut port = Port::new(0xf4);
+        port.write(exit_code as u32);
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+// Can't use 0 because 正常終了したQEMUの返り値と衝突する
+pub enum QemuExitCode {
+    Success = 0x10,
+    Failed = 0x11,
+}
+
+// Test
+
 #[cfg(test)]
 #[no_mangle]
 pub extern "C" fn _start() -> ! {
+    init();
     test_main();
     loop {}
 }
