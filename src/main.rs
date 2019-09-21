@@ -13,6 +13,11 @@ pub extern "C" fn _start() -> ! {
 
     ros::init();
 
+    use x86_64::registers::control::Cr3;
+
+    let (level4_page_table, _) = Cr3::read();
+    println!("Level4 page table at: {:?}", level4_page_table.start_address());
+
     #[cfg(test)]
     test_main();
 
