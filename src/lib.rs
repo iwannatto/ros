@@ -9,10 +9,9 @@ use core::panic::PanicInfo;
 
 pub mod gdt;
 pub mod interrupts;
+pub mod memory;
 pub mod serial;
 pub mod vga_buffer;
-
-// Initialize
 
 pub fn init() {
     gdt::init();
@@ -20,16 +19,6 @@ pub fn init() {
     unsafe { interrupts::PICS.lock().initialize(); }
     x86_64::instructions::interrupts::enable();
 }
-
-// Utility
-
-pub fn hlt_loop() -> ! {
-    loop {
-        x86_64::instructions::hlt();
-    }
-}
-
-// Test Helper
 
 pub fn test_runner(tests: &[&dyn Fn()]) {
     serial_println!("Running {} tests", tests.len());
@@ -46,6 +35,14 @@ pub fn test_panic_handler(info: &PanicInfo) -> ! {
     hlt_loop();
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+// Can't use 0 because 正常終了したQEMUの返り値と衝突する
+pub enum QemuExitCode {
+    Success = 0x10,
+    Failed = 0x11,
+}
+
 // Call QEMU's ISA debug exit (see Cargo.toml/package.metadata.bootimage)
 pub fn exit_qemu(exit_code: QemuExitCode) {
     use x86_64::instructions::port::Port;
@@ -56,19 +53,20 @@ pub fn exit_qemu(exit_code: QemuExitCode) {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[repr(u32)]
-// Can't use 0 because 正常終了したQEMUの返り値と衝突する
-pub enum QemuExitCode {
-    Success = 0x10,
-    Failed = 0x11,
+pub fn hlt_loop() -> ! {
+    loop {
+        x86_64::instructions::hlt();
+    }
 }
 
-// Test
+#[cfg(test)]
+use bootloader::{entry_point, BootInfo};
 
 #[cfg(test)]
-#[no_mangle]
-pub extern "C" fn _start() -> ! {
+entry_point!(test_kernel_main);
+
+#[cfg(test)]
+fn test_kernel_main(_boot_info: &'static BootInfo) -> ! {
     init();
     test_main();
     hlt_loop();
