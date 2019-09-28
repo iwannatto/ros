@@ -90,3 +90,11 @@ unsafe impl FrameAllocator<Size4KiB> for BootInfoFrameAllocator {
         frame
     }
 }
+
+// Can be used as test
+//
+// let page = Page::containing_address(VirtAddr::new(0xdeadbeaf000));
+// memory::create_example_mapping(page, &mut mapper, &mut frame_allocator);
+//
+// let page_ptr: *mut u64 = page.start_address().as_mut_ptr();
+// unsafe { page_ptr.offset(400).write_volatile(0x_f021_f077_f065_f04e) };
